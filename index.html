@@ -305,6 +305,216 @@
     html{ scroll-behavior:auto; }
     .btn{ transition:none; }
   }
+
+  /* AUDIT FORM & RESULTS */
+  .audit-section {
+    padding: 60px 0;
+    border-top: 1px solid var(--line);
+  }
+  .audit-container {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(43,38,32,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .audit-container:hover {
+    box-shadow: 0 6px 24px rgba(43,38,32,0.08);
+  }
+  .audit-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.8rem;
+    font-weight: 500;
+    margin-top: 0;
+    margin-bottom: 24px;
+    color: var(--ink);
+  }
+  .form-group {
+    margin-bottom: 24px;
+  }
+  .form-label {
+    display:block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sage-deep);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .form-input, .form-textarea {
+    width: 100%;
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1rem;
+    color: var(--ink);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+  .form-input:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--sage);
+    background: var(--card);
+  }
+  .form-textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-label input {
+    accent-color: var(--sage);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+  
+  /* Loading Spinner */
+  .spinner-container {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    gap: 16px;
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--line);
+    border-top-color: var(--sage);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .spinner-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--sage-deep);
+  }
+
+  /* Error Alert */
+  .error-alert {
+    display: none;
+    background: #FDF3F2;
+    border: 1px solid var(--mark-red);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    color: var(--mark-red-deep);
+    font-size: 0.95rem;
+  }
+  .error-alert h4 {
+    margin: 0 0 6px 0;
+    font-weight: 600;
+  }
+
+  /* Results Display */
+  .results-container {
+    display: none;
+    margin-top: 40px;
+    border-top: 2px dashed var(--line);
+    padding-top: 40px;
+  }
+  .results-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+  }
+  .results-meta span b {
+    color: var(--ink);
+  }
+  .verification-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .verification-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-pass {
+    background: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+  }
+  .badge-fail {
+    background: #FFEBEE;
+    color: #C62828;
+    border: 1px solid #EF9A9A;
+  }
+  .tag-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .tag-pill {
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease;
+  }
+  .tag-pill:hover {
+    background: var(--sage-tint);
+    color: var(--sage-deep);
+    border-color: var(--sage);
+  }
+  .claims-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+  }
+  .claim-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .claim-item .check-icon {
+    color: #2E7D32;
+    font-weight: bold;
+  }
+  .claim-item.empty {
+    font-style: italic;
+    color: var(--ink-soft);
+  }
 </style>
 </head>
 <body>
@@ -350,6 +560,124 @@
           <div class="after-line">Speckled Stoneware Coffee Mug — Handmade Housewarming Gift for Coffee Lovers</div>
         </div>
         <p class="fix-note"><b>Why:</b> "cute gift" wasn't in the top buyer search terms for this category — "housewarming gift" and "coffee lovers" were, and three competitor listings ranking above this one used them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="audit-section" class="audit-section">
+    <div class="wrap">
+      <div class="audit-container">
+        <h2 class="audit-title">Interactive Listing Audit</h2>
+        
+        <!-- Error Alert -->
+        <div id="audit-error" class="error-alert" role="alert">
+          <h4>Optimization Error</h4>
+          <span class="error-message"></span>
+        </div>
+
+        <!-- Audit Intake Form -->
+        <form id="audit-form-element" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="audit-listing-url">Etsy Listing URL (Required)</label>
+            <input class="form-input" type="url" id="audit-listing-url" required placeholder="https://www.etsy.com/listing/123456789/custom-name-necklace">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Seller Differentiators / Claims</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-label">
+                <input type="checkbox" name="differentiators" value="handmade craftsmanship">
+                Handmade Craftsmanship
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="differentiators" value="quality">
+                Premium Quality
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="differentiators" value="customization">
+                Customization Available
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="differentiators" value="price">
+                Competitive Price
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" name="differentiators" value="fast-shipping">
+                Fast Shipping
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="audit-other-details">Other Differentiator Details (Optional)</label>
+            <textarea class="form-input" id="audit-other-details" placeholder="e.g. Free personalization options, 100% recycled packaging, etc."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="audit-stats-ref">Historical Stats Fixture Reference (Optional)</label>
+            <input class="form-input" type="text" id="audit-stats-ref" placeholder="e.g. fixture_low_views_csv" value="fixture_low_views_csv">
+          </div>
+
+          <button class="btn" type="submit" id="audit-submit-btn">Run Audit</button>
+        </form>
+
+        <!-- Loading spinner -->
+        <div id="audit-spinner" class="spinner-container">
+          <div class="spinner"></div>
+          <span class="spinner-text">Running Discoverability Audit Pipeline...</span>
+        </div>
+
+        <!-- Results panel -->
+        <div id="audit-results" class="results-container">
+          <h3 class="audit-title" style="margin-bottom:12px;">Audit Output</h3>
+          
+          <div class="results-meta">
+            <span>Branch: <b id="meta-branch">N/A</b></span>
+            <span>Category: <b id="meta-category">N/A</b></span>
+            <span>Audit ID: <b id="meta-id">N/A</b></span>
+          </div>
+
+          <!-- Quality / verification badges -->
+          <div class="verification-badges">
+            <span id="badge-structural" class="verification-badge">Structural Valid ✓</span>
+            <span id="badge-factual" class="verification-badge">Factual Compliance ✓</span>
+            <span id="badge-business" class="verification-badge">Business Alignment ✓</span>
+          </div>
+
+          <!-- Comparative output card (markup layout) -->
+          <div class="markup" style="margin-bottom:30px;">
+            <div class="markup-head">
+              <span>optimized_copy_output.txt</span>
+              <span>proposed rewrite changes</span>
+            </div>
+            <div class="markup-body">
+              <div class="markup-field">
+                <span class="markup-label">Proposed Title</span>
+                <div id="result-title" class="after-line"></div>
+              </div>
+              <div class="markup-field">
+                <span class="markup-label">Proposed Tags (13)</span>
+                <div id="result-tags" class="tag-pills"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Copywriter justification -->
+          <div class="form-group">
+            <label class="form-label">SEO Copywriter Justification</label>
+            <p id="result-justification" style="color:var(--ink-soft); margin-top:4px; font-size:0.98rem;"></p>
+          </div>
+
+          <!-- Verified Claims -->
+          <div class="form-group">
+            <label class="form-label">Verified Listing Claims</label>
+            <ul id="claims-list" class="claims-list"></ul>
+          </div>
+
+          <div style="font-family:'IBM Plex Mono', monospace; font-size:0.75rem; color:var(--ink-soft); text-align:right;">
+            Total Evidence Pieces Checked: <span id="evidence-count">0</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -553,5 +881,6 @@
   <span><a href="mailto:REPLACE_WITH_CONTACT_EMAIL">Contact</a></span>
 </footer>
 
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
