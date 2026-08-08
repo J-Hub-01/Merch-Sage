@@ -9,8 +9,13 @@ LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 GEMINI_MODEL_ID = os.getenv("GEMINI_MODEL_ID", "gemini-3.5-flash")
 
 # Etsy API to Gemini production gating flag
-# True = Gated (use mock/CSV uploads only); False = Allowed (only if written permission is confirmed)
+# True = Gated (use mock/fixture data only); False = Allowed (only if written permission is confirmed)
+# NOTE: this now actually gates MarketplaceEvidenceProvider (previously
+# defined here but unused anywhere in the codebase).
 ETSY_API_GATING = os.getenv("ETSY_API_GATING", "True").lower() in ("true", "1", "yes")
+
+# Required only when ETSY_API_GATING=False
+ETSY_API_KEY = os.getenv("ETSY_API_KEY", None)
 
 # Which concrete LLMProvider to instantiate: "vertex" | "ai_studio"
 # Defaulting to ai_studio while GCP Billing is blocked. Flip back to
