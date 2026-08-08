@@ -66,3 +66,27 @@ class VertexAIGeminiProvider(LLMProvider):
         return get_mock_response(prompt, system_instruction)
 
 
+def get_llm_provider() -> "LLMProvider":
+    """
+    Factory: returns the active LLMProvider implementation based on
+    config.LLM_PROVIDER. This is the ONLY place provider selection
+    logic should live -- callers (orchestrator, etc.) should always
+    go through this function rather than instantiating a concrete
+    provider class directly, so that switching backends (e.g. once
+    GCP Billing is restored) is a single config change.
+    """
+    from backend.config import LLM_PROVIDER
+
+    if LLM_PROVIDER == "ai_studio":
+        from backend.providers.llm_provider_aistudio import AIStudioGeminiProvider
+        return AIStudioGeminiProvider()
+    elif LLM_PROVIDER == "vertex":
+        return VertexAIGeminiProvider()
+    else:
+        logger.warning(
+            f"Unrecognized LLM_PROVIDER='{LLM_PROVIDER}'. Defaulting to AI Studio."
+        )
+        from backend.providers.llm_provider_aistudio import AIStudioGeminiProvider
+        return AIStudioGeminiProvider()
+
+

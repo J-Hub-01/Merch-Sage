@@ -12,6 +12,16 @@ GEMINI_MODEL_ID = os.getenv("GEMINI_MODEL_ID", "gemini-3.5-flash")
 # True = Gated (use mock/CSV uploads only); False = Allowed (only if written permission is confirmed)
 ETSY_API_GATING = os.getenv("ETSY_API_GATING", "True").lower() in ("true", "1", "yes")
 
+# Which concrete LLMProvider to instantiate: "vertex" | "ai_studio"
+# Defaulting to ai_studio while GCP Billing is blocked. Flip back to
+# "vertex" once Google Cloud Billing is restored -- no other code
+# change should be required (see get_llm_provider() factory in
+# backend/providers/llm_provider.py).
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ai_studio").lower()
+
+# Required only when LLM_PROVIDER=ai_studio
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", None)
+
 # Local storage path for JSON files
 AUDIT_STORE_DIR = os.getenv("AUDIT_STORE_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
 os.makedirs(AUDIT_STORE_DIR, exist_ok=True)

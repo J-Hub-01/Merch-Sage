@@ -1,7 +1,7 @@
 import logging
 from backend.models.audit import AuditContext
 from backend.models.intake import SellerIntakePayload
-from backend.providers.llm_provider import LLMProvider, VertexAIGeminiProvider
+from backend.providers.llm_provider import LLMProvider, get_llm_provider
 from backend.providers.marketplace import MarketplaceEvidenceProvider
 from backend.providers.historical_stats import HistoricalStatsProvider
 from backend.providers.audit_store import AuditStore, LocalJsonAuditStore
@@ -31,7 +31,7 @@ def run_audit(intake: SellerIntakePayload) -> dict:
     logger.info("=== MerchSage Audit Pipeline Started ===")
 
     # Initialize providers
-    llm = VertexAIGeminiProvider()
+    llm = get_llm_provider()
     marketplace = MarketplaceEvidenceProvider()
     historical_stats = HistoricalStatsProvider()
     store = LocalJsonAuditStore()
