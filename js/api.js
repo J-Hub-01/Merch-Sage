@@ -2,7 +2,7 @@
  * api.js - Client wrapper for contacting the MerchSage FastAPI backend.
  */
 
-const DEFAULT_BASE_URL = 'http://localhost:8000';
+const DEFAULT_BASE_URL = 'https://merch-sage.onrender.com';
 
 export function getBaseUrl() {
   // If served locally on port 8000 or same-origin backend, use current origin, otherwise fallback to local backend.
@@ -57,11 +57,11 @@ export async function triggerAudit(payload) {
     try {
       const errorJson = await response.json();
       if (errorJson && errorJson.detail) {
-        errorDetail = typeof errorJson.detail === 'string' 
-          ? errorJson.detail 
+        errorDetail = typeof errorJson.detail === 'string'
+          ? errorJson.detail
           : JSON.stringify(errorJson.detail);
       }
-    } catch (_) {}
+    } catch (_) { }
     throw new Error(errorDetail);
   }
 
