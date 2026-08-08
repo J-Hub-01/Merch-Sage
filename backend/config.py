@@ -16,6 +16,7 @@ ETSY_API_GATING = os.getenv("ETSY_API_GATING", "True").lower() in ("true", "1", 
 
 # Required only when ETSY_API_GATING=False
 ETSY_API_KEY = os.getenv("ETSY_API_KEY", None)
+ETSY_SHARED_SECRET = os.getenv("ETSY_SHARED_SECRET", None)
 
 # Which concrete LLMProvider to instantiate: "vertex" | "ai_studio"
 # Defaulting to ai_studio while GCP Billing is blocked. Flip back to

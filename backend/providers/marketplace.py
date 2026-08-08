@@ -4,8 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 import requests
 from backend.models.evidence import EvidenceObject
-from backend.config import ETSY_API_GATING, ETSY_API_KEY
-
+from backend.config import ETSY_API_GATING, ETSY_API_KEY, ETSY_SHARED_SECRET
 logger = logging.getLogger("MerchSage.MarketplaceEvidenceProvider")
 
 ETSY_LISTING_URL_PATTERN = re.compile(r"etsy\.com/listing/(\d+)")
@@ -67,7 +66,7 @@ class MarketplaceEvidenceProvider:
         try:
             resp = requests.get(
                 f"{ETSY_API_BASE}/listings/{listing_id}",
-                headers={"x-api-key": ETSY_API_KEY},
+                headers={"x-api-key": f"{ETSY_API_KEY}:{ETSY_SHARED_SECRET}"},
                 timeout=10,
             )
             resp.raise_for_status()
