@@ -38,6 +38,8 @@ def run_audit(intake: SellerIntakePayload) -> dict:
 
     # Initialize audit context
     context = AuditContext(intake_payload=intake)
+    context.active_llm_provider = f"{type(llm).__name__} ({'live' if getattr(llm, 'initialized', False) else 'mock fallback'})"
+    logger.info(f"Active LLM provider: {context.active_llm_provider}")
     logger.info(f"Audit ID: {context.audit_id}")
 
     # ── Stage 1: Intake ──────────────────────────────────────────────

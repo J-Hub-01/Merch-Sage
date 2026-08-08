@@ -18,3 +18,4 @@ class AuditContext(BaseModel):
     formatter_report: Optional[Dict[str, Any]] = None  # Final output
     status: str = "intake"
     errors: List[str] = Field(default_factory=list)
+    active_llm_provider: Optional[str] = None  # e.g. "AIStudioGeminiProvider (live)" or "VertexAIGeminiProvider (mock fallback)"

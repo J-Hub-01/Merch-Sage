@@ -24,11 +24,16 @@ class MarketplaceEvidenceProvider:
 
     Mapped fields: title, description, tags, quantity, listing_state,
     price, creation_tsz. taxonomy_id, images, and shop_info remain
-    deferred -- taxonomy_id has no name-resolution lookup wired up yet,
-    images has no multimodal consumer yet, and shop_info would require
-    an additional getShop call that isn't implemented. All three should
-    be added once their respective downstream capability exists, not
-    as raw/fabricated placeholders.
+    deferred:
+      TODO(taxonomy_id): add once a taxonomy-name-resolution lookup
+        (Etsy's getSellerTaxonomyNodes) is implemented -- a raw
+        integer ID has no semantic value to the LLM on its own.
+      TODO(images): add once a multimodal step exists to consume it --
+        generate_text() is currently text-only, so an image URL string
+        is unusable context.
+      TODO(shop_info): add once getShop is implemented -- the prior
+        fixture fabricated a shop name/listing count with no backing
+        API call, which is worse than omitting the field.
 
     Gated by config.ETSY_API_GATING (default True == fixture-only),
     consistent with the AI/ML-content compliance concern documented in
@@ -67,8 +72,25 @@ class MarketplaceEvidenceProvider:
             )
             resp.raise_for_status()
             listing = resp.json()
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            logger.error(f"Etsy getListing HTTP error for listing_id={listing_id}: status={status}. Falling back to fixture data.")
+            return self._get_fixture_evidence(listing_url)
+        except requests.exceptions.Timeout:
+            logger.error(f"Etsy getListing timed out for listing_id={listing_id}. Falling back to fixture data.")
+            return self._get_fixture_evidence(listing_url)
         except Exception as e:
             logger.error(f"Etsy getListing call failed for listing_id={listing_id}: {e}. Falling back to fixture data.")
+            return self._get_fixture_evidence(listing_url)
+
+        # Response validation: don't build EvidenceObjects from a response
+        # missing fields the pipeline actually depends on. Fail safe to
+        # fixture rather than propagate partial/malformed evidence.
+        if not listing.get("title") or not listing.get("description"):
+            logger.error(
+                f"Etsy getListing response for listing_id={listing_id} is missing required "
+                f"fields (title/description). Falling back to fixture data."
+            )
             return self._get_fixture_evidence(listing_url)
 
         data_payload = {
