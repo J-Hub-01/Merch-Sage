@@ -5,10 +5,6 @@
 const DEFAULT_BASE_URL = 'https://merch-sage.onrender.com';
 
 export function getBaseUrl() {
-  // If served locally on port 8000 or same-origin backend, use current origin, otherwise fallback to local backend.
-  if (window.location.origin && window.location.origin.includes(':8000')) {
-    return window.location.origin;
-  }
   return DEFAULT_BASE_URL;
 }
 

@@ -7,7 +7,7 @@ from backend.models.evidence import EvidenceObject
 from backend.config import ETSY_API_GATING, ETSY_API_KEY, ETSY_SHARED_SECRET
 logger = logging.getLogger("MerchSage.MarketplaceEvidenceProvider")
 
-ETSY_LISTING_URL_PATTERN = re.compile(r"etsy\.com/listing/(\d+)")
+ETSY_LISTING_URL_PATTERN = re.compile(r"etsy\.com/(?:[^/]+/)?listing/(\d+)")
 ETSY_API_BASE = "https://openapi.etsy.com/v3/application"
 
 
