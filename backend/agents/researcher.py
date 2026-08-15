@@ -114,8 +114,23 @@ class ResearcherAgent:
             now_str = datetime.utcnow().isoformat() + "Z"
             
             evals_by_id = {item["hypothesis_id"]: item for item in res.get("hypothesis_evaluations", [])}
-            
+
+            # --- DIAGNOSTIC LOGGING ONLY (temporary) ---
+            # Purpose: confirm whether live Researcher responses return
+            # hypothesis_id values matching what Entrepreneur (possibly
+            # via mock fallback) actually generated. Does not alter
+            # fallback behavior, ID matching, or success logic in any way.
+            expected_ids = [
+                ev.supporting_data["hypothesis"].get("hypothesis_id")
+                for ev in context.evidence_store
+                if ev.origin == "EntrepreneurAgent" and "hypothesis" in ev.supporting_data
+            ]
+            logger.info(f"[DIAGNOSTIC] Expected hypothesis IDs (from EntrepreneurAgent evidence): {expected_ids}")
+            logger.info(f"[DIAGNOSTIC] Researcher evals_by_id keys (from live/mock response): {list(evals_by_id.keys())}")
+            # --- END DIAGNOSTIC LOGGING ---
+
             # Update the untested hypotheses in evidence store
+            matched_count = 0
             for ev in context.evidence_store:
                 if ev.origin == "EntrepreneurAgent" and "hypothesis" in ev.supporting_data:
                     hyp_id = ev.supporting_data["hypothesis"].get("hypothesis_id")
@@ -126,6 +141,11 @@ class ResearcherAgent:
                         ev.supporting_data["evaluation_details"] = evaluation.get("details", "")
                         ev.provenance.append("ResearcherAgent Evaluation")
                         ev.timestamp = now_str
+                        matched_count += 1
+
+            # --- DIAGNOSTIC LOGGING ONLY (temporary) ---
+            logger.info(f"[DIAGNOSTIC] Hypotheses matched and updated: {matched_count} / {len(expected_ids)}")
+            # --- END DIAGNOSTIC LOGGING ---
             
             # Create new Evidence Objects for evaluated seller claims
             for claim_eval in res.get("seller_claim_evaluations", []):
