@@ -7,10 +7,23 @@ logger = logging.getLogger("MerchSage.LLMProvider")
 
 class LLMProvider(ABC):
     @abstractmethod
-    def generate_text(self, prompt: str, system_instruction: str = None, response_schema: dict = None) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str = None,
+        response_schema: dict = None,
+        raise_on_quota_exhaustion: bool = False,
+    ) -> str:
         """
         Generates text using the configured Gemini model.
         Claude is strictly prohibited from being used here.
+
+        raise_on_quota_exhaustion: when True and the provider detects a
+        non-transient quota-exhaustion failure, raise
+        GeminiQuotaExhaustedError instead of silently falling through to
+        the developer mock. Only AIStudioGeminiProvider currently
+        implements this distinction; other providers accept and ignore
+        the flag so callers can pass it unconditionally.
         """
         pass
 
@@ -31,7 +44,18 @@ class VertexAIGeminiProvider(LLMProvider):
         except Exception as e:
             logger.warning(f"Failed to initialize Vertex AI SDK: {e}. Falling back to developer-mock mode.")
 
-    def generate_text(self, prompt: str, system_instruction: str = None, response_schema: dict = None) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str = None,
+        response_schema: dict = None,
+        raise_on_quota_exhaustion: bool = False,
+    ) -> str:
+        # Note: raise_on_quota_exhaustion is currently a no-op here. Vertex
+        # AI quota errors are not yet classified into transient/non-transient
+        # the way AIStudioGeminiProvider does -- accepted for interface
+        # compatibility so callers (e.g. SeoSpecialist) can pass it
+        # unconditionally regardless of which provider is active.
         if self.initialized:
             try:
                 from vertexai.generative_models import GenerativeModel, GenerationConfig

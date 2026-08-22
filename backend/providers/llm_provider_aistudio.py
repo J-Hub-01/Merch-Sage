@@ -3,6 +3,7 @@ import time
 from backend.config import GEMINI_MODEL_ID, GEMINI_API_KEY
 from backend.providers.llm_provider import LLMProvider
 from backend.providers.llm_mock import get_mock_response
+from backend.providers.exceptions import GeminiQuotaExhaustedError
 
 logger = logging.getLogger("MerchSage.LLMProvider.AIStudio")
 
@@ -11,6 +12,19 @@ logger = logging.getLogger("MerchSage.LLMProvider.AIStudio")
 # framework, not shared with VertexAIGeminiProvider.
 MAX_RETRIES = 2
 RETRY_DELAY_SECONDS = 1.5
+
+
+def _is_quota_exhausted(exc: Exception) -> bool:
+    """
+    Detects HTTP 429 RESOURCE_EXHAUSTED (daily/per-minute free-tier quota
+    ceiling) as distinct from transient failures like 503 UNAVAILABLE.
+
+    A quota ceiling will not clear in 1.5s, so retrying against it is a
+    guaranteed-wasted call -- unlike a genuine transient overload, where
+    a short retry can plausibly succeed.
+    """
+    msg = str(exc)
+    return "RESOURCE_EXHAUSTED" in msg or "429" in msg
 
 
 class AIStudioGeminiProvider(LLMProvider):
@@ -44,7 +58,13 @@ class AIStudioGeminiProvider(LLMProvider):
                 f"Falling back to developer-mock mode."
             )
 
-    def generate_text(self, prompt: str, system_instruction: str = None, response_schema: dict = None) -> str:
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str = None,
+        response_schema: dict = None,
+        raise_on_quota_exhaustion: bool = False,
+    ) -> str:
         if self.initialized:
             from google.genai import types
 
@@ -64,6 +84,7 @@ class AIStudioGeminiProvider(LLMProvider):
             generate_config = types.GenerateContentConfig(**config_args) if config_args else None
 
             last_error = None
+            quota_exhausted = False
             for attempt in range(1, MAX_RETRIES + 2):  # initial attempt + up to MAX_RETRIES retries
                 try:
                     response = self.client.models.generate_content(
@@ -74,6 +95,15 @@ class AIStudioGeminiProvider(LLMProvider):
                     return response.text
                 except Exception as e:
                     last_error = e
+
+                    if _is_quota_exhausted(e):
+                        quota_exhausted = True
+                        logger.error(
+                            f"AI Studio Gemini call failed (attempt {attempt}/{MAX_RETRIES + 1}): {e}. "
+                            f"Quota exhaustion is non-transient -- skipping remaining retries."
+                        )
+                        break
+
                     if attempt <= MAX_RETRIES:
                         logger.warning(
                             f"AI Studio Gemini call failed (attempt {attempt}/{MAX_RETRIES + 1}): {e}. "
@@ -85,6 +115,15 @@ class AIStudioGeminiProvider(LLMProvider):
                             f"AI Studio Gemini call failed after {MAX_RETRIES + 1} attempts: {last_error}. "
                             f"Attempting developer-mock fallback."
                         )
+
+            if quota_exhausted and raise_on_quota_exhaustion:
+                raise GeminiQuotaExhaustedError(str(last_error))
+
+            if quota_exhausted:
+                logger.warning(
+                    "Quota exhausted and caller did not opt into raise_on_quota_exhaustion "
+                    "-- attempting developer-mock fallback (legacy behavior)."
+                )
 
         # Developer-mock fallback mode (shared across all LLMProvider implementations)
         return get_mock_response(prompt, system_instruction)

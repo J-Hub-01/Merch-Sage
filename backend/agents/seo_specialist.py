@@ -4,6 +4,7 @@ from datetime import datetime
 from backend.models.audit import AuditContext
 from backend.models.evidence import EvidenceObject
 from backend.providers.llm_provider import LLMProvider
+from backend.providers.exceptions import GeminiQuotaExhaustedError
 
 logger = logging.getLogger("MerchSage.SeoSpecialist")
 
@@ -60,27 +61,74 @@ class DiscoverabilitySeoCopySpecialist:
             f"Full Evidence Objects List:\n{json.dumps(evidence_summary, indent=2)}\n"
         )
         
-        response_text = self.llm_provider.generate_text(
-            prompt=prompt,
-            system_instruction=system_instruction,
-            response_schema={
-                "type": "OBJECT",
-                "properties": {
-                    "proposed_title": {"type": "STRING"},
-                    "proposed_tags": {
-                        "type": "ARRAY",
-                        "items": {"type": "STRING"}
+        try:
+            response_text = self.llm_provider.generate_text(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_schema={
+                    "type": "OBJECT",
+                    "properties": {
+                        "proposed_title": {"type": "STRING"},
+                        "proposed_tags": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"}
+                        },
+                        "justification": {"type": "STRING"},
+                        "claims_made": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"}
+                        }
                     },
-                    "justification": {"type": "STRING"},
-                    "claims_made": {
-                        "type": "ARRAY",
-                        "items": {"type": "STRING"}
-                    }
+                    "required": ["proposed_title", "proposed_tags", "justification", "claims_made"]
                 },
-                "required": ["proposed_title", "proposed_tags", "justification", "claims_made"]
+                raise_on_quota_exhaustion=True,
+            )
+        except GeminiQuotaExhaustedError as e:
+            # Non-transient failure: live Gemini is unavailable for this
+            # request because the quota ceiling has been hit. Rather than
+            # fall through to a static, listing-unrelated developer mock
+            # (which would silently describe a different product), return
+            # the seller's own real, current title/tags unchanged. This is
+            # honest and trivially evidence-grounded -- every "claim" in it
+            # is already backed by the observed-fact Evidence Object it was
+            # read from -- at the cost of not being AI-optimized this run.
+            logger.warning(
+                f"Gemini quota exhausted during SEO Specialist stage: {e}. "
+                f"Falling back to the listing's own current title/tags "
+                f"(no AI-generated claims) instead of developer mock."
+            )
+            solution_data = {
+                "specialist": "DiscoverabilitySeoCopySpecialist",
+                "proposed_title": original_listing.get("title") or "",
+                "proposed_tags": list(original_listing.get("tags") or []),
+                "justification": (
+                    "AI-generated SEO recommendations were unavailable for this run "
+                    "because the Gemini API quota was exhausted. The listing's current, "
+                    "unmodified title and tags are shown as a safe fallback -- no new "
+                    "claims were generated, so nothing here goes beyond what Etsy already "
+                    "reports for this listing."
+                ),
+                "claims_made": [],
+                "degraded": True,
+                "degradation_reason": "gemini_quota_exhausted",
             }
-        )
-        
+            context.specialist_solutions.append(solution_data)
+
+            now_str = datetime.utcnow().isoformat() + "Z"
+            solution_ev = EvidenceObject(
+                source_type="inference",
+                origin="DiscoverabilitySeoCopySpecialist",
+                timestamp=now_str,
+                confidence="LOW",
+                evidence_state="SUPPORTED",
+                provenance=["Triage Results & Evidence -> DiscoverabilitySeoCopySpecialist (degraded: quota exhausted)"],
+                supporting_data=solution_data,
+                downstream_consumers=["Verification", "BusinessVerifierAgent"]
+            )
+            context.evidence_store.append(solution_ev)
+            context.status = "solved"
+            return
+
         try:
             res = json.loads(response_text)
             
