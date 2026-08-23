@@ -3,7 +3,7 @@ import time
 from backend.config import GEMINI_MODEL_ID, GEMINI_API_KEY
 from backend.providers.llm_provider import LLMProvider
 from backend.providers.llm_mock import get_mock_response
-from backend.providers.exceptions import GeminiQuotaExhaustedError
+from backend.providers.exceptions import GeminiQuotaExhaustedError, GeminiAuthError
 
 logger = logging.getLogger("MerchSage.LLMProvider.AIStudio")
 
@@ -25,6 +25,27 @@ def _is_quota_exhausted(exc: Exception) -> bool:
     """
     msg = str(exc)
     return "RESOURCE_EXHAUSTED" in msg or "429" in msg
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    """
+    Detects HTTP 401 UNAUTHENTICATED / 403 PERMISSION_DENIED -- a
+    missing, invalid, revoked, or insufficiently-scoped API key.
+
+    Retrying against a bad credential is exactly as pointless as
+    retrying against exhausted quota (it will never succeed), but the
+    correct response is different: this is a configuration/
+    infrastructure failure affecting every stage identically, not a
+    single-stage degraded case, so it is always raised rather than
+    routed through any per-stage fallback.
+    """
+    msg = str(exc)
+    return (
+        "401" in msg
+        or "403" in msg
+        or "UNAUTHENTICATED" in msg
+        or "PERMISSION_DENIED" in msg
+    )
 
 
 class AIStudioGeminiProvider(LLMProvider):
@@ -95,6 +116,19 @@ class AIStudioGeminiProvider(LLMProvider):
                     return response.text
                 except Exception as e:
                     last_error = e
+
+                    if _is_auth_error(e):
+                        # Always raised, never opt-in, never retried, never
+                        # routed through mock: a bad credential means every
+                        # remaining stage in the pipeline is about to fail
+                        # identically, so there is nothing a per-stage
+                        # fallback could meaningfully do here.
+                        logger.error(
+                            f"AI Studio Gemini call failed (attempt {attempt}/{MAX_RETRIES + 1}): {e}. "
+                            f"Authentication/authorization failure is non-retryable and non-degradable "
+                            f"-- raising immediately, no mock fallback."
+                        )
+                        raise GeminiAuthError(str(e))
 
                     if _is_quota_exhausted(e):
                         quota_exhausted = True

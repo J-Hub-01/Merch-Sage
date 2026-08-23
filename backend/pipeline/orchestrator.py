@@ -16,6 +16,7 @@ from backend.agents.report_formatter import ReportFormatterAgent
 from backend.verification.structural import verify_structure
 from backend.verification.factual_legal import verify_factual_legal_integrity
 from backend.config import MAX_INTERNAL_RETRIES
+from backend.providers.exceptions import GeminiAuthError
 
 logger = logging.getLogger("MerchSage.Orchestrator")
 
@@ -27,6 +28,13 @@ def run_audit(intake: SellerIntakePayload) -> dict:
     """
     Executes the full Discoverability vertical slice pipeline sequentially.
     Returns the final structured JSON report.
+
+    A GeminiAuthError (401/403 -- bad/missing/revoked API key) raised by
+    any stage is caught here, at the pipeline level, rather than by any
+    individual agent: a bad credential means every remaining stage is
+    about to fail identically, so this is an infrastructure/configuration
+    failure, not a normal per-audit error, and must never silently
+    produce fabricated audit content via mock fallback.
     """
     logger.info("=== MerchSage Audit Pipeline Started ===")
 
@@ -42,6 +50,40 @@ def run_audit(intake: SellerIntakePayload) -> dict:
     logger.info(f"Active LLM provider: {context.active_llm_provider}")
     logger.info(f"Audit ID: {context.audit_id}")
 
+    try:
+        return _execute_pipeline_stages(intake, llm, marketplace, historical_stats, store, context)
+    except GeminiAuthError as e:
+        logger.error(
+            f"Pipeline aborted: Gemini authentication/configuration failure: {e}. "
+            f"This is an infrastructure issue, not a problem with the listing or "
+            f"seller data -- no fabricated audit content will be produced."
+        )
+        context.status = "infrastructure_error"
+        context.errors.append(f"Gemini authentication/configuration failure: {e}")
+        failure_report = {
+            "audit_id": context.audit_id,
+            "pipeline_status": "failed",
+            "failure_type": "gemini_authentication_error",
+            "error": (
+                "This audit could not be completed because Gemini authentication/"
+                "configuration failed (invalid, missing, or unauthorized API "
+                "credentials). This is an infrastructure issue on MerchSage's side, "
+                "not a problem with the listing or the submitted data. No audit "
+                "content was generated for this request."
+            ),
+            "errors": context.errors,
+        }
+        context.formatter_report = failure_report
+        store.save_context(context)
+        return failure_report
+
+
+def _execute_pipeline_stages(intake, llm, marketplace, historical_stats, store, context) -> dict:
+    """
+    The actual stage sequence, unchanged from before this patch except
+    for being moved into its own function so run_audit() can wrap it in
+    a single GeminiAuthError handler above.
+    """
     # ── Stage 1: Intake ──────────────────────────────────────────────
     # Seller differentiators are stored as seller-claim evidence,
     # NOT promoted to facts.
