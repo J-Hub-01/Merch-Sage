@@ -3,7 +3,7 @@ import time
 from backend.config import GEMINI_MODEL_ID, GEMINI_API_KEY
 from backend.providers.llm_provider import LLMProvider
 from backend.providers.llm_mock import get_mock_response
-from backend.providers.exceptions import GeminiQuotaExhaustedError, GeminiAuthError
+from backend.providers.exceptions import GeminiQuotaExhaustedError, GeminiAuthError, GeminiGenerationError
 
 logger = logging.getLogger("MerchSage.LLMProvider.AIStudio")
 
@@ -147,7 +147,7 @@ class AIStudioGeminiProvider(LLMProvider):
                     else:
                         logger.error(
                             f"AI Studio Gemini call failed after {MAX_RETRIES + 1} attempts: {last_error}. "
-                            f"Attempting developer-mock fallback."
+                            f"Retries exhausted."
                         )
 
             if quota_exhausted and raise_on_quota_exhaustion:
@@ -158,6 +158,26 @@ class AIStudioGeminiProvider(LLMProvider):
                     "Quota exhausted and caller did not opt into raise_on_quota_exhaustion "
                     "-- attempting developer-mock fallback (legacy behavior)."
                 )
+            else:
+                # Retries were exhausted (or a persistent 503 never
+                # recovered) on a failure that is neither quota
+                # exhaustion nor an auth error -- e.g. an unclassified
+                # 500, a connection failure, or a timeout. This is a
+                # genuine live-Gemini failure with no valid result, not
+                # a case for silent mock fallback: always raise, same
+                # as GeminiAuthError, so the orchestrator can surface
+                # this as an infrastructure failure instead of letting
+                # fabricated mock content enter a real audit.
+                logger.error(
+                    f"AI Studio Gemini call failed permanently after exhausting retries: "
+                    f"{last_error}. Raising GeminiGenerationError -- no mock fallback for "
+                    f"a live Gemini failure."
+                )
+                raise GeminiGenerationError(str(last_error))
 
-        # Developer-mock fallback mode (shared across all LLMProvider implementations)
+        # Developer-mock fallback mode: only reached when no live provider
+        # was ever configured (self.initialized is False), or when quota
+        # was exhausted and the caller did not opt into raise_on_quota_exhaustion
+        # (unchanged legacy behavior from 0011). Never reached for a live
+        # call that failed for any other reason -- see GeminiGenerationError above.
         return get_mock_response(prompt, system_instruction)

@@ -16,7 +16,7 @@ from backend.agents.report_formatter import ReportFormatterAgent
 from backend.verification.structural import verify_structure
 from backend.verification.factual_legal import verify_factual_legal_integrity
 from backend.config import MAX_INTERNAL_RETRIES
-from backend.providers.exceptions import GeminiAuthError
+from backend.providers.exceptions import GeminiAuthError, GeminiGenerationError
 
 logger = logging.getLogger("MerchSage.Orchestrator")
 
@@ -70,6 +70,30 @@ def run_audit(intake: SellerIntakePayload) -> dict:
                 "credentials). This is an infrastructure issue on MerchSage's side, "
                 "not a problem with the listing or the submitted data. No audit "
                 "content was generated for this request."
+            ),
+            "errors": context.errors,
+        }
+        context.formatter_report = failure_report
+        store.save_context(context)
+        return failure_report
+    except GeminiGenerationError as e:
+        logger.error(
+            f"Pipeline aborted: live Gemini call failed permanently after exhausting "
+            f"retries: {e}. No mock content will be substituted -- surfacing this as "
+            f"a generation failure rather than reporting a fabricated 'verified' audit."
+        )
+        context.status = "infrastructure_error"
+        context.errors.append(f"Gemini generation failure (retries exhausted): {e}")
+        failure_report = {
+            "audit_id": context.audit_id,
+            "pipeline_status": "failed",
+            "failure_type": "gemini_generation_error",
+            "error": (
+                "This audit could not be completed because a live Gemini call failed "
+                "and did not recover after retrying. This is a transient infrastructure "
+                "issue, not a problem with the listing or the submitted data. No "
+                "fabricated or mock audit content was produced for this request -- "
+                "please try again shortly."
             ),
             "errors": context.errors,
         }

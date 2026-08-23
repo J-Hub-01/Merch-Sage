@@ -36,3 +36,26 @@ class GeminiAuthError(Exception):
     the orchestrator, not swallowed by any individual agent.
     """
     pass
+
+
+class GeminiGenerationError(Exception):
+    """
+    Raised when a live Gemini call ultimately fails -- after exhausting
+    the existing bounded retries -- for any reason that is NOT quota
+    exhaustion (GeminiQuotaExhaustedError) and NOT an auth failure
+    (GeminiAuthError). Covers unclassified/unknown exceptions (e.g. a
+    generic 500), connection failures, timeouts, and a persistent 503
+    that never recovers within the retry budget.
+
+    Like GeminiAuthError, this is NOT opt-in and is always raised --
+    never routed through get_mock_response(). A live Gemini stage that
+    genuinely failed to produce a result must never be silently
+    replaced with fabricated mock content (e.g. unrelated necklace copy
+    appearing in a tote-bag audit) -- that would let the pipeline report
+    a "verified" audit when no valid AI result was ever produced for
+    that stage. This does NOT affect the separate, legitimate
+    developer-mock mode, which is only used when no live provider was
+    ever configured (self.initialized is False) -- that path is
+    untouched by this exception.
+    """
+    pass
