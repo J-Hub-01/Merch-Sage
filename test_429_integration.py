@@ -302,14 +302,23 @@ def main():
           "customer-facing report -- pre-existing gap, not caused by this test, not fixed here.")
 
     # ── Assertion 7: verification passes cleanly, pipeline completes honestly ──
+    # NOTE: updated after the pipeline_status semantics fix (see
+    # backend/agents/report_formatter.py::_derive_final_status). This
+    # exact scenario -- a quota-exhausted degraded fallback that still
+    # cleanly passes verification -- is precisely the case that fix
+    # exists to correct: it is now "degraded" (a safe fallback was used,
+    # not a live AI-generated result), never "verified"/"success". The
+    # previous version of this assertion (`== "verified"`) was written
+    # before that fix existed and encoded the exact bug it closes.
     vr = report.get("verification_results") or {}
     assert vr.get("factual_legal", {}).get("passed") is True, vr.get("factual_legal")
     assert vr.get("structural", {}).get("passed") is True, vr.get("structural")
-    assert report.get("pipeline_status") == "verified"
+    assert report.get("pipeline_status") == "degraded", report.get("pipeline_status")
     assert report.get("errors") == []
     print("[7/7] PASS: both structural and factual/legal verification passed cleanly on the "
-          "first attempt (13 real tags => no padding needed); pipeline_status='verified', "
-          "errors=[] -- the full chain completed honestly with zero fabricated content.")
+          "first attempt (13 real tags => no padding needed); pipeline_status='degraded' "
+          "(correctly distinct from 'success' -- this was a safe fallback, not a live AI "
+          "result), errors=[] -- the full chain completed honestly with zero fabricated content.")
 
     print("\n=== ALL 7 CHECKS PASSED: full 429 -> degraded-fallback chain confirmed. ===")
     print(f"Total Gemini calls across whole pipeline: {len(fake_client.call_log)} "

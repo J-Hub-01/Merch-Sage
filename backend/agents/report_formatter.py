@@ -4,6 +4,72 @@ from backend.models.audit import AuditContext
 
 logger = logging.getLogger("MerchSage.ReportFormatter")
 
+
+def _derive_final_status(context: AuditContext) -> str:
+    """
+    Derives the customer-facing pipeline_status independently of
+    context.status's internal per-stage bookkeeping value.
+
+    context.status is used elsewhere purely as a per-stage progress/
+    abort marker ("intake_complete", "evidence_collected", "error", the
+    upstream-agent-specific "qc_verified"/"verified" values) -- it was
+    never designed to answer "was the final audit result actually a
+    full, non-degraded, verification-clean success?" BusinessVerifier's
+    own context.status = "verified" reflects only whether ITS OWN
+    independent business-compatibility call parsed successfully; it has
+    no visibility into verification_results or any specialist solution's
+    degraded flag, so it cannot answer that question either.
+
+    This function is the single, deterministic place that combines all
+    three signals actually needed:
+
+      - context.status == "error"      -> a mandatory stage failed
+                                           outright (e.g. BusinessVerifier
+                                           itself couldn't parse a
+                                           response) -> "failed"
+      - any specialist solution has
+        degraded=True                  -> a safe fallback was used
+                                           (e.g. the 0011 Gemini-quota
+                                           fallback) instead of a live
+                                           AI-generated result -> "degraded"
+      - any verification_results entry
+        has passed=False               -> the generated content did not
+                                           cleanly pass domain
+                                           verification, even though the
+                                           pipeline proceeded with
+                                           flagged issues -> "degraded"
+      - none of the above              -> "success"
+
+    Deliberately conservative: if verification_results is missing
+    entirely in a case that isn't already caught by context.status ==
+    "error" (not expected to occur given current orchestrator control
+    flow, but not assumed here), this treats that as "degraded" rather
+    than silently defaulting to "success".
+    """
+    if context.status == "error":
+        return "failed"
+
+    any_degraded = any(
+        isinstance(sol, dict) and sol.get("degraded") is True
+        for sol in (context.specialist_solutions or [])
+    )
+    if any_degraded:
+        return "degraded"
+
+    vr = context.verification_results
+    if not vr:
+        return "degraded"
+
+    any_failed_check = any(
+        isinstance(check, dict) and check.get("passed") is False
+        for check in vr.values()
+    )
+    if any_failed_check:
+        return "degraded"
+
+    return "success"
+
+
 class ReportFormatterAgent:
     """
     Deterministic report assembly — no LLM calls.
@@ -71,7 +137,7 @@ class ReportFormatterAgent:
             "verification_results": context.verification_results,
             "business_verification": context.business_verification_results,
             "total_evidence_objects": len(context.evidence_store),
-            "pipeline_status": context.status,
+            "pipeline_status": _derive_final_status(context),
             "errors": context.errors,
         }
 
