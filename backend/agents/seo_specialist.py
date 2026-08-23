@@ -21,7 +21,7 @@ class DiscoverabilitySeoCopySpecialist:
         
         original_listing = {}
         for ev in context.evidence_store:
-            if ev.source_type == "observed fact" and ev.origin == "Etsy API Listings Endpoint":
+            if ev.source_type == "observed fact" and ev.origin.startswith("Etsy API Listings Endpoint"):
                 original_listing.update(ev.supporting_data)
         
         evidence_summary = []
