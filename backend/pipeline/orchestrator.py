@@ -16,7 +16,7 @@ from backend.agents.report_formatter import ReportFormatterAgent
 from backend.verification.structural import verify_structure
 from backend.verification.factual_legal import verify_factual_legal_integrity
 from backend.config import MAX_INTERNAL_RETRIES
-from backend.providers.exceptions import GeminiAuthError, GeminiGenerationError
+from backend.providers.exceptions import GeminiAuthError, GeminiGenerationError, GeminiQuotaExhaustedError
 
 logger = logging.getLogger("MerchSage.Orchestrator")
 
@@ -94,6 +94,31 @@ def run_audit(intake: SellerIntakePayload) -> dict:
                 "issue, not a problem with the listing or the submitted data. No "
                 "fabricated or mock audit content was produced for this request -- "
                 "please try again shortly."
+            ),
+            "errors": context.errors,
+        }
+        context.formatter_report = failure_report
+        store.save_context(context)
+        return failure_report
+    except GeminiQuotaExhaustedError as e:
+        logger.error(
+            f"Pipeline aborted: Gemini quota exhausted at a stage with no safe "
+            f"degraded fallback: {e}. No mock content will be substituted -- "
+            f"surfacing this as an honest failure rather than reporting a "
+            f"fabricated 'success' audit."
+        )
+        context.status = "infrastructure_error"
+        context.errors.append(f"Gemini quota exhausted (no safe fallback for this stage): {e}")
+        failure_report = {
+            "audit_id": context.audit_id,
+            "pipeline_status": "failed",
+            "failure_type": "gemini_quota_exhausted_error",
+            "error": (
+                "This audit could not be completed because the Gemini API quota was "
+                "exhausted at a stage of the audit that has no safe way to produce a "
+                "partial result without inventing information. This is usually "
+                "temporary and often resolves on its own -- please try again shortly. "
+                "No fabricated or mock audit content was produced for this request."
             ),
             "errors": context.errors,
         }

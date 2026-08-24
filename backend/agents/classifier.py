@@ -51,7 +51,17 @@ class ClassifierAgent:
                     "reasoning": {"type": "STRING"}
                 },
                 "required": ["category", "confidence", "reasoning"]
-            }
+            },
+            # Classification is foundational -- every downstream stage's
+            # reasoning is scoped by context.classification, and there is
+            # no raw Etsy field (taxonomy_id is not yet implemented; see
+            # marketplace.py) that could substitute for this judgment
+            # without inventing a category. A quota-exhaustion failure
+            # here has no safe degraded fallback, so it must propagate
+            # (uncaught, deliberately -- see the orchestrator's new
+            # GeminiQuotaExhaustedError handler) rather than silently
+            # falling back to unrelated developer-mock content.
+            raise_on_quota_exhaustion=True,
         )
         
         try:
