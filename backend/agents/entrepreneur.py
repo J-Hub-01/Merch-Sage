@@ -77,7 +77,22 @@ class EntrepreneurAgent:
                     }
                 },
                 "required": ["hypotheses"]
-            }
+            },
+            # Entrepreneur's hypotheses are stored as source_type="inference"
+            # and Researcher's own contract ("test every Entrepreneur-mandated
+            # hypothesis... strictly against the provided Evidence Objects")
+            # assumes they are genuine, listing-grounded reasoning. There is
+            # no existing evidence that can stand in for a not-yet-generated
+            # hypothesis (unlike SEO, which can truthfully re-propose the
+            # seller's current real title/tags), and a generic/category-based
+            # fallback would be exactly the LLM-guess-as-fact pattern the
+            # product's evidence-grounding principle rejects. A quota-
+            # exhaustion failure here therefore has no safe degraded
+            # fallback, so it must propagate (uncaught, deliberately -- see
+            # the orchestrator's GeminiQuotaExhaustedError handler, added in
+            # 0016) rather than silently falling back to unrelated
+            # developer-mock content.
+            raise_on_quota_exhaustion=True,
         )
         
         try:
