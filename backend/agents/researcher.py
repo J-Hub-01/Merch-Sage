@@ -102,7 +102,22 @@ class ResearcherAgent:
                     }
                 },
                 "required": ["hypothesis_evaluations", "seller_claim_evaluations"]
-            }
+            },
+            # Researcher both mutates existing EntrepreneurAgent evidence
+            # in place (confidence/evidence_state/evaluation_details) and
+            # creates brand-new ResearcherAgent seller-claim evidence --
+            # neither of which happens until AFTER this call returns (the
+            # mutation/creation logic lives entirely inside the try: block
+            # below, never reached if this call raises). A quota-exhausted
+            # legacy-mock fallback here does not just contaminate internal
+            # state: it was confirmed to reach seller_claim_evaluations in
+            # the final customer-facing report directly, with claim text
+            # unrelated to what the seller actually submitted. This stage
+            # therefore follows the same pattern as Classification (0016)
+            # and Entrepreneur (0017): propagate GeminiQuotaExhaustedError
+            # (uncaught, deliberately) to the orchestrator's existing
+            # handler rather than silently fabricating evaluations.
+            raise_on_quota_exhaustion=True,
         )
         
         try:
