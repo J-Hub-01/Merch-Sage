@@ -4,6 +4,7 @@ from datetime import datetime
 from backend.models.audit import AuditContext
 from backend.models.evidence import EvidenceObject
 from backend.providers.llm_provider import LLMProvider
+from backend.providers.exceptions import GeminiQuotaExhaustedError
 
 logger = logging.getLogger("MerchSage.BusinessVerifier")
 
@@ -66,33 +67,70 @@ class BusinessVerifierAgent:
             f"Full Evidence List:\n{json.dumps(evidence_summary, indent=2)}\n"
         )
         
-        response_text = self.llm_provider.generate_text(
-            prompt=prompt,
-            system_instruction=system_instruction,
-            response_schema={
-                "type": "OBJECT",
-                "properties": {
-                    "is_compatible": {"type": "BOOLEAN"},
-                    "conflicts": {
-                        "type": "ARRAY",
-                        "items": {"type": "STRING"}
-                    },
-                    "evaluations": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "solution_ref": {"type": "STRING"},
-                                "status": {"type": "STRING"},
-                                "justification": {"type": "STRING"}
-                            },
-                            "required": ["solution_ref", "status", "justification"]
+        try:
+            response_text = self.llm_provider.generate_text(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_schema={
+                    "type": "OBJECT",
+                    "properties": {
+                        "is_compatible": {"type": "BOOLEAN"},
+                        "conflicts": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"}
+                        },
+                        "evaluations": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "solution_ref": {"type": "STRING"},
+                                    "status": {"type": "STRING"},
+                                    "justification": {"type": "STRING"}
+                                },
+                                "required": ["solution_ref", "status", "justification"]
+                            }
                         }
-                    }
+                    },
+                    "required": ["is_compatible", "conflicts", "evaluations"]
                 },
-                "required": ["is_compatible", "conflicts", "evaluations"]
-            }
-        )
+                raise_on_quota_exhaustion=True,
+            )
+        except GeminiQuotaExhaustedError as e:
+            # Unlike Classification/Entrepreneur/Researcher, a compatibility
+            # judgment here has no schema-supported neutral value (is_compatible
+            # is a hard boolean; every evaluation must be APPROVED or REJECTED) --
+            # inventing either True or False would itself be an unearned
+            # assertion. But business_verification_results already defaults to
+            # None on a fresh AuditContext, and the orchestrator runs
+            # ReportFormatter unconditionally after this stage regardless of
+            # outcome -- so simply leaving the field unset is the same truthful
+            # "not verified" state a not-yet-run audit is already in, requiring
+            # zero fabricated judgment (not even a conservative one). Marked
+            # degraded via the same mechanism SEO (0011) and Triage (0019)
+            # already use.
+            logger.warning(
+                f"Gemini quota exhausted during Business Verifier stage: {e}. "
+                f"Leaving business_verification_results unset (the existing "
+                f"truthful default) instead of falling back to developer mock."
+            )
+            now_str = datetime.utcnow().isoformat() + "Z"
+            verifier_ev = EvidenceObject(
+                source_type="inference",
+                origin="BusinessVerifierAgent",
+                timestamp=now_str,
+                confidence="LOW",
+                evidence_state="SUPPORTED",
+                provenance=["Specialist Solutions & Claims -> BusinessVerifierAgent (degraded: quota exhausted)"],
+                supporting_data={
+                    "business_verification": None,
+                    "degraded": True,
+                    "degradation_reason": "gemini_quota_exhausted",
+                },
+                downstream_consumers=["ReportFormatterAgent"]
+            )
+            context.evidence_store.append(verifier_ev)
+            return
         
         try:
             res = json.loads(response_text)

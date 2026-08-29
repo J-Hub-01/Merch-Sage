@@ -21,7 +21,7 @@ def _derive_final_status(context: AuditContext) -> str:
     degraded flag, so it cannot answer that question either.
 
     This function is the single, deterministic place that combines all
-    three signals actually needed:
+    four signals actually needed:
 
       - context.status == "error"      -> a mandatory stage failed
                                            outright (e.g. BusinessVerifier
@@ -32,6 +32,28 @@ def _derive_final_status(context: AuditContext) -> str:
                                            (e.g. the 0011 Gemini-quota
                                            fallback) instead of a live
                                            AI-generated result -> "degraded"
+      - any evidence_store entry has
+        supporting_data.degraded=True  -> a safe fallback was used by
+                                           a stage whose degraded marker
+                                           lives on its own evidence
+                                           object rather than on
+                                           specialist_solutions (e.g.
+                                           Triage's 0019 fallback, or
+                                           BusinessVerifier's own quota-
+                                           exhaustion fallback, which
+                                           leaves business_verification_
+                                           results unset and cannot be
+                                           detected any other way) ->
+                                           "degraded". This is the same
+                                           degraded/degradation_reason
+                                           marker convention SEO (0011)
+                                           already writes into its own
+                                           evidence object alongside
+                                           specialist_solutions -- this
+                                           check generalizes detection to
+                                           that shared convention rather
+                                           than adding a stage-specific
+                                           special case.
       - any verification_results entry
         has passed=False               -> the generated content did not
                                            cleanly pass domain
@@ -54,6 +76,13 @@ def _derive_final_status(context: AuditContext) -> str:
         for sol in (context.specialist_solutions or [])
     )
     if any_degraded:
+        return "degraded"
+
+    any_degraded_evidence = any(
+        isinstance(ev.supporting_data, dict) and ev.supporting_data.get("degraded") is True
+        for ev in (context.evidence_store or [])
+    )
+    if any_degraded_evidence:
         return "degraded"
 
     vr = context.verification_results
