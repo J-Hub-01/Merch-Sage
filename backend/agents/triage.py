@@ -4,6 +4,7 @@ from datetime import datetime
 from backend.models.audit import AuditContext
 from backend.models.evidence import EvidenceObject
 from backend.providers.llm_provider import LLMProvider
+from backend.providers.exceptions import GeminiQuotaExhaustedError
 
 logger = logging.getLogger("MerchSage.Triage")
 
@@ -61,38 +62,79 @@ class TriageAgent:
             f"{json.dumps(confirmed_evidence, indent=2)}\n"
         )
         
-        response_text = self.llm_provider.generate_text(
-            prompt=prompt,
-            system_instruction=system_instruction,
-            response_schema={
-                "type": "OBJECT",
-                "properties": {
-                    "problems": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "problem_id": {"type": "STRING"},
-                                "title": {"type": "STRING"},
-                                "severity": {"type": "STRING"},
-                                "is_root_cause": {"type": "BOOLEAN"},
-                                "dependencies": {
-                                    "type": "ARRAY",
-                                    "items": {"type": "STRING"}
+        try:
+            response_text = self.llm_provider.generate_text(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                response_schema={
+                    "type": "OBJECT",
+                    "properties": {
+                        "problems": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "problem_id": {"type": "STRING"},
+                                    "title": {"type": "STRING"},
+                                    "severity": {"type": "STRING"},
+                                    "is_root_cause": {"type": "BOOLEAN"},
+                                    "dependencies": {
+                                        "type": "ARRAY",
+                                        "items": {"type": "STRING"}
+                                    },
+                                    "description": {"type": "STRING"},
+                                    "associated_evidence_ids": {
+                                        "type": "ARRAY",
+                                        "items": {"type": "STRING"}
+                                    }
                                 },
-                                "description": {"type": "STRING"},
-                                "associated_evidence_ids": {
-                                    "type": "ARRAY",
-                                    "items": {"type": "STRING"}
-                                }
-                            },
-                            "required": ["problem_id", "title", "severity", "is_root_cause", "dependencies", "description", "associated_evidence_ids"]
+                                "required": ["problem_id", "title", "severity", "is_root_cause", "dependencies", "description", "associated_evidence_ids"]
+                            }
                         }
-                    }
+                    },
+                    "required": ["problems"]
                 },
-                "required": ["problems"]
-            }
-        )
+                raise_on_quota_exhaustion=True,
+            )
+        except GeminiQuotaExhaustedError as e:
+            # Unlike Classification/Entrepreneur/Researcher, Triage already
+            # has a truthful, non-fabricated "nothing to report" output
+            # built in above (lines 29-33) for the structurally identical
+            # case of having no confirmed evidence to triage. A live-call
+            # failure is evidence-wise indistinguishable from that case --
+            # there is nothing safely establishable either way -- so reuse
+            # the exact same truthful payload instead of falling through to
+            # the developer mock's fabricated, listing-unrelated problems.
+            # Marked degraded via the same mechanism SEO Specialist (0011)
+            # uses, so the failure is not silently identical to a genuine
+            # empty-triage result internally, even though the report-level
+            # gap (degraded flag not surfaced in the customer report,
+            # found in 0012) remains separate, deferred scope.
+            logger.warning(
+                f"Gemini quota exhausted during Triage stage: {e}. "
+                f"Falling back to the same truthful empty result already used "
+                f"when there is no confirmed evidence, instead of developer mock."
+            )
+            context.triage_results = {"problems": []}
+
+            now_str = datetime.utcnow().isoformat() + "Z"
+            triage_ev = EvidenceObject(
+                source_type="inference",
+                origin="TriageAgent",
+                timestamp=now_str,
+                confidence="LOW",
+                evidence_state="SUPPORTED",
+                provenance=["TriageAgent (degraded: quota exhausted)"],
+                supporting_data={
+                    "problem_graph": context.triage_results,
+                    "degraded": True,
+                    "degradation_reason": "gemini_quota_exhausted",
+                },
+                downstream_consumers=["DiscoverabilitySeoCopySpecialist"]
+            )
+            context.evidence_store.append(triage_ev)
+            context.status = "triaged"
+            return
         
         try:
             res = json.loads(response_text)
