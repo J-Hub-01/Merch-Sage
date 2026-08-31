@@ -6,7 +6,7 @@ LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 
 # The confirmed runtime model for MerchSage's own LLM tasks
 # CLAUDE IS FORBIDDEN as a runtime model or fallback.
-GEMINI_MODEL_ID = os.getenv("GEMINI_MODEL_ID", "gemini-3.5-flash")
+GEMINI_MODEL_ID = os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash")
 
 # Etsy API to Gemini production gating flag
 # True = Gated (use mock/fixture data only); False = Allowed (only if written permission is confirmed)
